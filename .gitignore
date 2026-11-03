@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build / pack artifacts
+*.tgz
+dist/
+
+# backups produced by the plugin itself
+bundles/
+DSH-Travel-*/
+
+# logs and local state
+*.log
+logs/
+state.json
+rollback/
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

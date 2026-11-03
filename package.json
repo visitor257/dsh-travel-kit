@@ -1,0 +1,51 @@
+{
+  "name": "dsh-travel-kit",
+  "version": "0.1.3",
+  "description": "Full DSH backup, migration and disaster recovery for DeepSeek Harness: packs conversations, workspaces, plugins, settings, credentials and the directory/junction layout into a verified bundle with a human-readable report.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./core": "./src/core.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "backup",
+    "migration",
+    "recovery"
+  ],
+  "license": "MIT",
+  "author": "visitor257",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/visitor257/dsh-travel-kit.git"
+  },
+  "homepage": "https://github.com/visitor257/dsh-travel-kit#readme",
+  "bugs": {
+    "url": "https://github.com/visitor257/dsh-travel-kit/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node --check src/core.js && node --check src/index.js && node --check src/skill.js",
+    "test": "node test/smoke.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.2"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

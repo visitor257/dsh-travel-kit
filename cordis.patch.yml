@@ -1,0 +1,7 @@
+# dsh-travel-kit bundle patch — 主机组合层。
+#
+# 单行插件：注册 dsh-travel-kit skill 与 travel_* 工具，无客户端 UI。
+- insert:
+    - id: travel-kit
+      name: 'dsh-travel-kit'
+      config: {}
