@@ -1,6 +1,6 @@
 {
   "name": "dsh-travel-kit",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Full DSH backup, migration and disaster recovery for DeepSeek Harness: packs conversations, workspaces, plugins, settings, credentials and the directory/junction layout into a verified bundle with a human-readable report.",
   "type": "module",
   "main": "src/index.js",

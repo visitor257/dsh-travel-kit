@@ -85,7 +85,7 @@ function listFiles(root) {
   return out
 }
 
-/** 递归复制目录，跳过软链（避免把联接指向的整棵树再复制一遍） */
+/** 递归复制目录；符号链接按原样重建（pnpm 的 .pnpm 内部是相对链接） */
 function copyTree(src, dst, opts = {}) {
   if (!fs.existsSync(src)) return 0
   let copied = 0
@@ -93,7 +93,17 @@ function copyTree(src, dst, opts = {}) {
   while (stack.length) {
     const [s, d] = stack.pop()
     const st = fs.lstatSync(s)
-    if (st.isSymbolicLink()) continue
+    if (st.isSymbolicLink()) {
+      try {
+        const link = fs.readlinkSync(s)
+        ensureDir(path.dirname(d))
+        fs.symlinkSync(link, d, isWindows() ? 'junction' : 'dir')
+        copied++
+      } catch {
+        /* 链接目标无关紧要时跳过 */
+      }
+      continue
+    }
     if (st.isDirectory()) {
       ensureDir(d)
       for (const e of fs.readdirSync(s, { withFileTypes: true })) {
@@ -405,7 +415,17 @@ export function exportBundle(opts) {
   } catch {
     /* 忽略 */
   }
-  skipped.push('profiles/desktop/node_modules')
+
+  // 插件代码：默认随包携带，这样还原后不依赖 pnpm（换路径/离网也能用）
+  if (opts.includeModules !== false) {
+    const srcNm = path.join(profileSrc, 'node_modules')
+    if (fs.existsSync(srcNm)) {
+      copyTree(srcNm, path.join(profileDst, 'node_modules'))
+      copiedDirs.push('profiles/desktop/node_modules')
+    }
+  } else {
+    skipped.push('profiles/desktop/node_modules')
+  }
 
   // 顶层文件与凭证
   for (const f of HOME_FILES) {
@@ -432,7 +452,7 @@ export function exportBundle(opts) {
   } else {
     skipped.push('electron-userdata')
   }
-  skipped.push('data/dsh-runtimes', 'profiles/desktop/node_modules')
+  skipped.push('data/dsh-runtimes')
 
   // 结构、插件、工作区
   const plugins = readPlugins(dshHome)
@@ -586,6 +606,25 @@ export function restoreBundle(opts) {
     } catch {
       /* 忽略 */
     }
+
+    // 插件代码：随包携带时直接落位，并清掉 pnpm 记录的绝对路径状态
+    const srcModules = path.join(srcProfile, 'node_modules')
+    if (fs.existsSync(srcModules)) {
+      const dstModules = path.join(dstProfile, 'node_modules')
+      copyTree(srcModules, dstModules)
+      for (const stale of ['.modules.yaml', '.pnpm-workspace-state-v1.json', path.join('.pnpm', 'lock.yaml')]) {
+        try {
+          fs.rmSync(path.join(dstModules, stale), { force: true })
+        } catch {
+          /* 忽略 */
+        }
+      }
+      actions.push('已还原插件代码（node_modules），并清理 pnpm 绝对路径状态')
+    } else if (fs.existsSync(path.join(dstProfile, 'node_modules'))) {
+      warnings.push('包内没有 node_modules：目标机将沿用现有插件目录，可能与被还原的 package.json 不一致')
+    } else {
+      warnings.push('包内没有 node_modules，且目标机尚未安装：首次启动需联网重装插件')
+    }
   }
 
   // 3) 界面状态
@@ -649,6 +688,38 @@ export function restoreBundle(opts) {
   }
 
   return { dryRun, problems, warnings, actions, manifest }
+}
+
+/** 插件完整性校验：package.json 声明的每个依赖是否真的在 node_modules 里 */
+export function verifyProfile(dshHome) {
+  const profileDir = path.join(dshHome, 'profiles', 'desktop')
+  const nm = path.join(profileDir, 'node_modules')
+  const entries = []
+  let pkg = null
+  try {
+    pkg = JSON.parse(fs.readFileSync(path.join(profileDir, 'package.json'), 'utf8').replace(/^\uFEFF/, ''))
+  } catch {
+    return { ok: false, entries: [], reason: '读不到 profiles/desktop/package.json' }
+  }
+  for (const [name, spec] of Object.entries(pkg.dependencies || {})) {
+    const dir = path.join(nm, ...name.split('/'))
+    let installed = null
+    try {
+      const p = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8').replace(/^\uFEFF/, ''))
+      installed = p.version || null
+    } catch {
+      installed = null
+    }
+    let status
+    if (!installed) status = 'missing'
+    else if (String(spec).startsWith('file:')) status = 'ok'
+    else {
+      const want = String(spec).replace(/^[\^~>=<]+/, '').split(' ')[0]
+      status = installed === want || installed.startsWith(want + '.') ? 'ok' : 'version-mismatch'
+    }
+    entries.push({ name, declared: String(spec), installed, status })
+  }
+  return { ok: entries.every((e) => e.status === 'ok'), entries, reason: null }
 }
 
 /* -------------------------------------------------------------- 报告 */

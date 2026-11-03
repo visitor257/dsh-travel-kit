@@ -38,7 +38,13 @@ DSH-Travel-<主机>-<时间>/
   layout/workspaces.json 工作区清单
 ```
 
-不打包：`node_modules`（按 `package.json` 重装）、`dsh-runtimes`（按需下载）。
+不打包：`dsh-runtimes`（可重建，按需下载）。`node_modules` **默认打包**（约 235 MB），
+这样还原后不依赖 pnpm、换盘换路径也能用；`includeModules: false` 可得到约 12 MB 精简包，
+但还原后需联网重装插件。
+
+> 0.1.3 及更早的包不含 `node_modules`。还原到不同路径时程序会尝试用 pnpm 重装，而
+> `node_modules/.modules.yaml` 里记录着旧机器的绝对路径（`storeDir` / `virtualStoreDir`），
+> pnpm 会以 `ERR_PNPM_UNEXPECTED_STORE` 失败，插件因此显示异常。0.1.4 起该文件在还原时被清除。
 
 ## 安全
 

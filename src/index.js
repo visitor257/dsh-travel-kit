@@ -16,6 +16,7 @@ import {
   restoreBundle,
   defaultBundleRoot,
   readPlugins,
+  verifyProfile,
 } from './core.js'
 import { SKILL_CONTENT, SKILL_DESCRIPTION, SKILL_NAME, SKILL_WHEN_TO_USE } from './skill.js'
 
@@ -121,6 +122,7 @@ export function apply(ctx) {
       note: { type: 'string', description: '写入报告的备注，例如"迁移前备份"。' },
       includeAttachments: { type: 'boolean', description: '是否包含附件，默认 true。' },
       includeCredentials: { type: 'boolean', description: '是否包含登录凭证，默认 true；共享备份时可设为 false。' },
+      includeModules: { type: 'boolean', description: '是否把插件代码（node_modules，约 235 MB）一起打包，默认 true；设为 false 得到约 12 MB 精简包，但还原后需联网重装插件。' },
     },
     output: textOutput,
     async execute(args) {
@@ -131,6 +133,7 @@ export function apply(ctx) {
         note: args.note,
         includeAttachments: args.includeAttachments !== false,
         includeCredentials: args.includeCredentials !== false,
+        includeModules: args.includeModules !== false,
       })
       return [
         '打包完成',
@@ -203,7 +206,21 @@ export function apply(ctx) {
         for (const p of r.problems.slice(0, 5)) lines.push(`  - ${p}`)
       }
       if (!dryRun) {
-        lines.push('', '请完全退出并重新启动 DeepSeek Harness，插件依赖会在启动时自动重装。')
+        lines.push('', '插件完整性校验:')
+        try {
+          const v = verifyProfile(path.join(installDir, 'data', 'dsh-home'))
+          for (const e of v.entries) {
+            const mark = e.status === 'ok' ? 'OK ' : '!! '
+            lines.push(`  ${mark}${e.name}  ${e.declared}${e.installed ? `  已装 ${e.installed}` : '  未安装'}`)
+          }
+          if (!v.ok) {
+            lines.push('', '  有插件未就位：若包内不含 node_modules，请启动 DSH 让它联网重装；')
+            lines.push('  或改用 includeModules=true（默认）重新打包后再还原。')
+          }
+        } catch (err) {
+          lines.push(`  校验失败: ${err && err.message ? err.message : err}`)
+        }
+        lines.push('', '请完全退出并重新启动 DeepSeek Harness。')
       }
       return lines.join('\n')
     },
